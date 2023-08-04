@@ -138,11 +138,7 @@ async function commands(message, collection) {
     // Adiciona uma quote nova na coleção do grupo
     case '!addquote':
       const knife = content.indexOf(':');
-      if (knife === -1 || content.substring(0, knife).indexOf(',') === -1)
-        return message.reply(
-          message.from,
-          'Aprende a adicionar quote seu burro 🙈',
-        );
+      if (knife === -1 || content.substring(0, knife).indexOf(',') === -1) return message.reply('Aprende a adicionar quote seu burro 🙈');
       // Adiciona mais 1 na conta da coleção config
       const autor = content.substring(0, knife).trim().split(',')[0];
       const data = content.substring(content.indexOf(',') + 2, knife).trim();
