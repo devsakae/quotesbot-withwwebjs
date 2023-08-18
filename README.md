@@ -14,7 +14,7 @@ Depois de instalado e configurado, use o bot escrevendo os seguintes comandos no
 #### Salvar quotes
 ```!addquote Nome, data: Frase que ele(a) disse```
 
-Exemplo: ```!addquote Rodrigo Sakae, julho de 2023: Vou fazer um bot que grava tudo o que vocês falam````
+Exemplo: ```!addquote Rodrigo Sakae, julho de 2023: Vou fazer um bot que grava tudo o que vocês falam```
 
 #### Pesquisar quotes
 ```!quote critério de pesquisa```
