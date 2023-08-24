@@ -4,7 +4,7 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 const { config } = require('dotenv');
 
 const client = new Client({
-  authStrategy: new LocalAuth({ clientId: "ec2" }),
+  authStrategy: new LocalAuth({ clientId: "quotebot" }),
 });
 
 config();
