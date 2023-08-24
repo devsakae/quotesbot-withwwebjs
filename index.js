@@ -4,7 +4,7 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 const { config } = require('dotenv');
 
 const client = new Client({
-  authStrategy: new LocalAuth({ clientId: "localteste" }),
+  authStrategy: new LocalAuth({ clientId: "ec2" }),
 });
 
 config();
@@ -121,7 +121,7 @@ async function commands(message, collection) {
       if (foundquote.length === 0) return message.reply('Tenho nada disso aí aqui 🫥');
 
       // Achou mais de 5? Muita coisa.
-      if (foundquote.length > 5) return message.reply(`Tá louco, tem ${foundquote.length} quotes aqui sobre '${content}'. Melhor a memória aí que eu te entrego alguma coisa.`)
+      if (foundquote.length > 30) return message.reply(`Tá louco, tem ${foundquote.length} quotes aqui sobre '${content}'. Melhor a memória aí que eu te entrego alguma coisa.`)
 
       // Achou mais de 1
       if (foundquote.length > 1) client.sendMessage(message.from, `ATENÇÃO PRA *MELHOR DAS ${foundquote.length} QUOTES* QUE EU TENHO AQUI COM O TEMA '${content.toUpperCase()}'`);
