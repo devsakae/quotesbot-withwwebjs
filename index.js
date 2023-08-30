@@ -42,12 +42,20 @@ client.initialize();
 
 let botworking = true;
 
+const formatQuote = (quote) => {
+  return `"${quote.quote}" (${quote.autor})
+
+${quote.gols > 0 ? `⚽️ ${quote.gols} pessoas consideraram essa mensagem um golaço` : 'Ninguém considerou essa mensagem um golaço' }
+✅ Tópico: ${quote.titulo}
+🗓 Data: ${quote.data}
+🤖 Id: ${ObjectId(quote._id).toString()}`}
+
 client.on('message', (message) => {
-  if (message.body === '!block' && message.from === process.env.BOT_OWNER) {
+  if (message.body === '!block' && message.author === process.env.BOT_OWNER) {
     botworking = false;
     return client.sendMessage(message.from, 'Entrei de férias 😎 🏖');
   }
-  if (message.body === '!unblock' && message.from === process.env.BOT_OWNER) {
+  if (message.body === '!unblock' && message.author === process.env.BOT_OWNER) {
     botworking = true;
     return message.reply('Tô na área');
   }
@@ -71,7 +79,7 @@ async function commands(message, collection) {
       .toArray();
     return client.sendMessage(
       message.from,
-      `"${randomQuote[0].quote}" (${randomQuote[0].autor}, ${randomQuote[0].data})`,
+      formatQuote(randomQuote[0]),
     );
   }
 
@@ -82,7 +90,7 @@ async function commands(message, collection) {
   const content = message.body.substring(message.body.indexOf(' ')).trim();
   const firstWord = (content.indexOf(' ') !== -1) ? content.substring(0, content.indexOf(' ')).trim() : content;
   const what = (content.indexOf(' ') !== -1) ? content.substring(firstWord.length + 1).trim() : '';
-  
+
   // Switch/case para verificar !quote, !quotefrom, !quoteby, !addquote e !delquote
   switch (quoteType) {
     case '!data':
@@ -99,14 +107,13 @@ async function commands(message, collection) {
         })
         .toArray();
 
-        console.log('SAMPLE:', quotesdated[0]);
       if (quotesdated.length < 1) return message.reply('Sabe o que eu encontrei?? Sabes???        nada')
       // Mais de 30? Muita coisa
       if (quotesdated.length > 30) return message.reply(`Encontrei mais de ${quotesdated.length} quotes nesse período, seja mais específico(a) bebê`);
       const sortDatedQuote = Math.floor(Math.random() * quotesdated.length);
       return client.sendMessage(
         message.from,
-        `Em ${quotesdated[sortDatedQuote].data}, *${quotesdated[sortDatedQuote].autor}* disse: "${quotesdated[sortDatedQuote].quote}"`,
+        formatQuote(quotesdated[sortDatedQuote]),
       );
 
     case '!autor':
@@ -129,7 +136,7 @@ async function commands(message, collection) {
       );
       return client.sendMessage(
         message.from,
-        `"${quotesfrom[sortQuoteby].quote}" (${quotesfrom[sortQuoteby].autor}, ${quotesfrom[sortQuoteby].data})`,
+        formatQuote(quotesfrom[sortQuoteby]),
       );
 
     case '!quote':
@@ -166,7 +173,7 @@ async function commands(message, collection) {
       // Devolve uma quote (a única, ou aleatória se houverem 5)
       return client.sendMessage(
         message.from,
-        `"${foundquote[random].quote}" (${foundquote[random].autor}, ${foundquote[random].data})`,
+        formatQuote(foundquote[random]),
       );
 
     // Adiciona uma quote nova na coleção do grupo
