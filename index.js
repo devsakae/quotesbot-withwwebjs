@@ -51,6 +51,13 @@ ${quote.gols > 0 ? `⚽️ ${quote.gols} pessoas consideraram essa mensagem um g
 🪪 Id: ${quote._id.toString()}`
 }
 
+const bestQuote = (array) => {
+  const scoredQuotes = array.filter(q => q.gols > 0);
+  if (scoredQuotes.length === 0) return formatQuote(array[Math.floor(Math.random() * array.length)]);
+  if (scoredQuotes.length > 1) scoredQuotes.sort((a, b) => b - a);
+  return formatQuote(scoredQuotes[0]);
+}
+
 client.on('message', (message) => {
   if (message.body === '!block' && message.author === process.env.BOT_OWNER) {
     botworking = false;
@@ -140,8 +147,7 @@ async function commands(message, collection) {
         formatQuote(quotesfrom[sortQuoteby]),
       );
 
-    case '!quote':
-      // Busca na database
+    case '!quote': // Procura por uma quote com parâmetros
       const foundquote = await db
         .collection(collection)
         .find({
@@ -152,30 +158,11 @@ async function commands(message, collection) {
         })
         .toArray();
 
-      // Não achou nada
-      if (foundquote.length === 0)
-        return message.reply('Tenho nada disso aí aqui 🫥');
-
-      // Achou mais de 5? Muita coisa.
-      if (foundquote.length > 30)
-        return message.reply(
-          `Tá louco, tem ${foundquote.length} quotes aqui sobre '${content}'. Melhora tua memória aí que eu te entrego alguma coisa.`,
-        );
-
-      // Achou mais de 1
-      if (foundquote.length > 1)
-        client.sendMessage(
-          message.from,
-          `ATENÇÃO PRA MELHOR DAS *${foundquote.length
-          } QUOTES* QUE EU TENHO AQUI NO TEMA '${content.toUpperCase()}'`,
-        );
-      const random = Math.floor(Math.random() * foundquote.length);
-
-      // Devolve uma quote (a única, ou aleatória se houverem 5)
-      return client.sendMessage(
-        message.from,
-        formatQuote(foundquote[random]),
-      );
+      if (foundquote.length === 0) return message.reply('Tenho nada disso aí aqui 🫥');
+      if (foundquote.length === 1) return client.sendMessage(message.from, formatQuote(foundquote[0]));
+      client.sendMessage(message.from, `ATENÇÃO PRA MELHOR DAS *${foundquote.length} QUOTES* QUE EU TENHO AQUI NO TEMA '${content.toUpperCase()}'`);
+      const response = bestQuote(foundquote);
+      return client.sendMessage(message.from, response);
 
     // Adiciona uma quote nova na coleção do grupo
     case '!addquote':
