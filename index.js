@@ -54,7 +54,7 @@ ${quote.gols > 0 ? `⚽️ ${quote.gols} pessoas consideraram essa mensagem um g
 const bestQuote = (array) => {
   const scoredQuotes = array.filter(q => q.gols > 0);
   if (scoredQuotes.length === 0) return formatQuote(array[Math.floor(Math.random() * array.length)]);
-  if (scoredQuotes.length > 1) scoredQuotes.sort((a, b) => b - a);
+  if (scoredQuotes.length > 1) scoredQuotes.sort((a, b) => b.gols - a.gols);
   return formatQuote(scoredQuotes[0]);
 }
 
