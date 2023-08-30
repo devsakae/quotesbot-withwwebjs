@@ -45,10 +45,11 @@ let botworking = true;
 const formatQuote = (quote) => {
   return `"${quote.quote}" (${quote.autor})
 
-${quote.gols > 0 ? `⚽️ ${quote.gols} pessoas consideraram essa mensagem um golaço` : 'Ninguém considerou essa mensagem um golaço' }
+${quote.gols > 0 ? `⚽️ ${quote.gols} pessoas consideraram essa mensagem um golaço` : 'Ninguém considerou essa mensagem um golaço'}
 ✅ Tópico: ${quote.titulo}
 🗓 Data: ${quote.data}
-🤖 Id: ${ObjectId(quote._id).toString()}`}
+🪪 Id: ${quote._id.toString()}`
+}
 
 client.on('message', (message) => {
   if (message.body === '!block' && message.author === process.env.BOT_OWNER) {
@@ -77,10 +78,8 @@ async function commands(message, collection) {
       .collection(collection)
       .aggregate([{ $sample: { size: 1 } }])
       .toArray();
-    return client.sendMessage(
-      message.from,
-      formatQuote(randomQuote[0]),
-    );
+
+    return client.sendMessage(message.from, formatQuote(randomQuote[0]));
   }
 
   // Não é aleatória? Bora ver o que é
@@ -99,10 +98,12 @@ async function commands(message, collection) {
         .find({
           $and: [
             { 'data': { $regex: firstWord, $options: 'i' } },
-            { $or: [
-              { 'autor': { $regex: what, $options: 'i' } },
-              { 'quote': { $regex: what, $options: 'i' } }
-            ] }
+            {
+              $or: [
+                { 'autor': { $regex: what, $options: 'i' } },
+                { 'quote': { $regex: what, $options: 'i' } }
+              ]
+            }
           ]
         })
         .toArray();
