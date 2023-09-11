@@ -1,5 +1,5 @@
 const qrcode = require('qrcode-terminal');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client } = require('whatsapp-web.js');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const { config } = require('dotenv');
 config();
@@ -15,6 +15,8 @@ const mongoclient = new MongoClient(process.env.MONGODB_URI, {
   },
 });
 const db = mongoclient.db('quotes');
+const birthdaydb = mongoclient.db('tigrebot');
+
 async function run() {
   try {
     await mongoclient.connect();
@@ -43,8 +45,9 @@ client.initialize();
 let botworking = true;
 
 const formatQuote = (quote) => {
-  return `"${quote.quote}" (${quote.autor})
+  return `"${quote.quote}"
 
+💬 Autor:${quote.autor}
 ${quote.gols > 0 ? `⚽️ ${quote.gols} pessoas consideraram essa mensagem um golaço` : 'Ninguém considerou essa mensagem um golaço'}
 ✅ Tópico: ${quote.titulo}
 🗓 Data: ${quote.data}
@@ -79,13 +82,34 @@ client.on('message', (message) => {
 });
 
 async function commands(message, collection) {
+  // Busca aniversariantes do dia
+  if (message.body === '!aniversarios') {
+    const today = new Date();
+    const dayAndMonth = today.toLocaleString('pt-br').substring(0, 5)
+    const thisYear = today.getFullYear()
+    const aniversariantes = await birthdaydb
+      .collection('aniversariantes')
+      .find({ birthday: { $regex: dayAndMonth } })
+      .toArray();
+    let response = 'Nenhum aniversário nessa data'
+    if (aniversariantes.length > 1) {
+      response = `🎉 *PARABÉNS PRA VOCÊ! EU SÓ VIM PRA COMER! ESQUECI O PRESENTE! NUNCA MAIS VOU TRAZER!*
+
+      Hoje é dia de festa pra essa cambada aqui debaixo, olha só:\n`;
+      aniversariantes.map((older) => {
+        const age = thisYear - new Date(older.birthday).getFullYear();
+        response.concat(`\n 🟤 ${older.name} (${older.position}) fazendo *${age}* anos`)
+      });
+    }
+    return client.sendMessage(message.from, response)
+  }
+
   // Verifica se é pedido de quote aleatória e entrega
   if (message.body === '!quote') {
     const randomQuote = await db
       .collection(collection)
       .aggregate([{ $sample: { size: 1 } }])
       .toArray();
-
     return client.sendMessage(message.from, formatQuote(randomQuote[0]));
   }
 
@@ -116,13 +140,8 @@ async function commands(message, collection) {
         .toArray();
 
       if (quotesdated.length < 1) return message.reply('Sabe o que eu encontrei?? Sabes???        nada')
-      // Mais de 30? Muita coisa
-      if (quotesdated.length > 30) return message.reply(`Encontrei mais de ${quotesdated.length} quotes nesse período, seja mais específico(a) bebê`);
-      const sortDatedQuote = Math.floor(Math.random() * quotesdated.length);
-      return client.sendMessage(
-        message.from,
-        formatQuote(quotesdated[sortDatedQuote]),
-      );
+      const bestByDate = bestQuote(quotesdated);
+      return client.sendMessage(message.from, bestByDate);
 
     case '!autor':
       const quotesfrom = await db
@@ -134,18 +153,10 @@ async function commands(message, collection) {
           ],
         })
         .toArray();
-      if (quotesfrom.length === 0)
-        return message.reply('Tem nada disso aí aqui 🫥'); // Não achou nada
-
-      const sortQuoteby = Math.floor(Math.random() * quotesfrom.length);
-      client.sendMessage(
-        message.from,
-        `Tenho ${quotesfrom.length} quote(s) do *${firstWord}*, mas a melhor é essa:`,
-      );
-      return client.sendMessage(
-        message.from,
-        formatQuote(quotesfrom[sortQuoteby]),
-      );
+      if (quotesfrom.length === 0) return message.reply('Tem nada disso aí aqui 🫥'); // Não achou nada
+      client.sendMessage(message.from, `Tenho ${quotesfrom.length} quote(s) do *${firstWord}*, mas a melhor é essa:`);
+      const bestByAuthor = bestQuote(quotesfrom);
+      return client.sendMessage(message.from, bestByAuthor);
 
     case '!quote': // Procura por uma quote com parâmetros
       const foundquote = await db
@@ -177,6 +188,8 @@ async function commands(message, collection) {
         quote: newcontent,
         autor: autor,
         data: data,
+        gols: 1,
+        topico: '(Mensagem no grupo)'
       };
       await db
         .collection('config_database')
