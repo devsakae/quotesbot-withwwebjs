@@ -85,20 +85,25 @@ async function commands(message, collection) {
   // Busca aniversariantes do dia
   if (message.body === '!aniversarios') {
     const today = new Date();
-    const dayAndMonth = today.toLocaleString('pt-br').substring(0, 5)
-    const thisYear = today.getFullYear()
+    const dayAndMonth = today.toLocaleString('pt-br').substring(0, 5);
+    const thisYear = today.getFullYear();
     const aniversariantes = await birthdaydb
       .collection('aniversariantes')
       .find({ birthday: { $regex: dayAndMonth } })
       .toArray();
-    let response = 'Nenhum aniversário nessa data'
+    let response = 'Nenhum aniversário cadastrado hoje. Tem que rodar o script lá';
     if (aniversariantes.length > 1) {
       response = `🎉 *PARABÉNS PRA VOCÊ! EU SÓ VIM PRA COMER! ESQUECI O PRESENTE! NUNCA MAIS VOU TRAZER!*
 
       Hoje é dia de festa pra essa cambada aqui debaixo, olha só:\n`;
+      aniversariantes.sort((a, b) => {
+        if (a.name < b.name) return -1;
+        if (a.name > b.name) return 1;
+        return 0;
+      });
       aniversariantes.map((older) => {
-        const age = thisYear - new Date(older.birthday).getFullYear();
-        response.concat(`\n 🟤 ${older.name} (${older.position}) fazendo *${age}* anos`)
+        const age = Number(thisYear) - Number(new Date(older.birthday).getFullYear());
+        response = response.concat(`\n🟤 ${older.name} (${older.position}) fazendo *${age}* anos`)
       });
     }
     return client.sendMessage(message.from, response)
