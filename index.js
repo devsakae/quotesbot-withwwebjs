@@ -47,7 +47,7 @@ let botworking = true;
 const formatQuote = (quote) => {
   return `"${quote.quote}"
 
-💬 Autor:${quote.autor}
+💬 ${quote.autor}
 ${quote.gols > 0 ? `⚽️ ${quote.gols} pessoas consideraram essa mensagem um golaço` : 'Ninguém considerou essa mensagem um golaço'}
 ✅ Tópico: ${quote.titulo}
 🗓 Data: ${quote.data}
