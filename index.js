@@ -15,7 +15,7 @@ const mongoclient = new MongoClient(process.env.MONGODB_URI, {
   },
 });
 const db = mongoclient.db('quotes');
-const birthdaydb = mongoclient.db('tigrebot');
+const tigrebot = mongoclient.db('tigrebot');
 
 async function run() {
   try {
@@ -47,11 +47,37 @@ let botworking = true;
 const formatQuote = (quote) => {
   return `"${quote.quote}"
 
-💬 ${quote.autor}
-${quote.gols > 0 ? `⚽️ ${quote.gols} pessoas consideraram essa mensagem um golaço` : 'Ninguém considerou essa mensagem um golaço'}
+💬 Postagem de *${quote.autor}*
+${quote.gols > 0 ? `⚽️ ${quote.gols} ${quote.gols > 1 ? 'pessoas consideraram' : 'pessoa considerou'} essa mensagem um golaço` : 'Ninguém considerou essa mensagem um golaço'}
 ✅ Tópico: ${quote.titulo}
 🗓 Data: ${quote.data}
 🪪 Id: ${quote._id.toString()}`
+}
+
+const addStats = (array) => {
+  const today = new Date();
+  const thisYear = today.getFullYear();
+  if (array.length === 1) {
+    const { stats } = array[0];
+    return `O CRAQUE da bola, o GÊNIO, LENDÁRIO *${array[0].nickname}* jogou aqui sim!
+
+Nome completo: ${array[0].name}
+Nascimento: ${array[0].birthday} (${Number(thisYear) - Number(new Date(array[0].birthday).getFullYear())} anos)
+Foto: ${array[0].image}
+
+🥅 ${stats.matches} partidas
+👍 ${stats.w} vitórias
+🫳 ${stats.d} empates
+👎 ${stats.l} derrotas 
+🟨 ${stats.yc} cartão(ões) amarelo(s)
+🟥 ${stats.rc} cartão(ões) vermelho(s)
+⚽️ ${stats.goals} gols marcados
+
+Fonte: http://www.meutimenarede.com.br - Scraped by @devsakae`
+  }
+  let maisDeUm = `Encontrei mais de um atleta que jogou aqui! Se liga e escolha o certo:\n`
+  array.forEach((obj) => maisDeUm = maisDeUm.concat(`\n✅ ${obj.name} (${obj.nickname}), jogou ${obj.stats.matches} partidas`))
+  return maisDeUm;
 }
 
 const bestQuote = (array) => {
@@ -82,33 +108,6 @@ client.on('message', (message) => {
 });
 
 async function commands(message, collection) {
-  // Busca aniversariantes do dia
-  if (message.body === '!aniversarios') {
-    const today = new Date();
-    const dayAndMonth = today.toLocaleString('pt-br').substring(0, 5);
-    const thisYear = today.getFullYear();
-    const aniversariantes = await birthdaydb
-      .collection('aniversariantes')
-      .find({ birthday: { $regex: dayAndMonth } })
-      .toArray();
-    let response = 'Nenhum aniversário cadastrado hoje. Tem que rodar o script lá';
-    if (aniversariantes.length > 1) {
-      response = `🎉 *PARABÉNS PRA VOCÊ! EU SÓ VIM PRA COMER! ESQUECI O PRESENTE! NUNCA MAIS VOU TRAZER!*
-
-      Hoje é dia de festa pra essa cambada aqui debaixo, olha só:\n`;
-      aniversariantes.sort((a, b) => {
-        if (a.name < b.name) return -1;
-        if (a.name > b.name) return 1;
-        return 0;
-      });
-      aniversariantes.map((older) => {
-        const age = Number(thisYear) - Number(new Date(older.birthday).getFullYear());
-        response = response.concat(`\n🟤 ${older.name} (${older.position}) fazendo *${age}* anos`)
-      });
-    }
-    return client.sendMessage(message.from, response)
-  }
-
   // Verifica se é pedido de quote aleatória e entrega
   if (message.body === '!quote') {
     const randomQuote = await db
@@ -128,6 +127,15 @@ async function commands(message, collection) {
 
   // Switch/case para verificar !quote, !quotefrom, !quoteby, !addquote e !delquote
   switch (quoteType) {
+    // Sistema que busca atletas que jogaram no Criciúma
+    case '!jogounotigre':
+      const atletasDoTigre = await tigrebot
+        .collection('jogadores')
+        .find({ 'nickname': { $regex: content, $options: 'i' } })
+        .toArray();
+      if (atletasDoTigre.length > 0) return client.sendMessage(message.from, addStats(atletasDoTigre));
+      return message.reply('Não jogou não 😒');
+
     case '!data':
       const quotesdated = await db
         .collection(collection)
