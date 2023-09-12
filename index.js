@@ -1,5 +1,5 @@
 const qrcode = require('qrcode-terminal');
-const { Client } = require('whatsapp-web.js');
+const { Client, MessageMedia } = require('whatsapp-web.js');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const { config } = require('dotenv');
 config();
@@ -59,24 +59,26 @@ const addStats = (array) => {
   const thisYear = today.getFullYear();
   if (array.length === 1) {
     const { stats } = array[0];
-    return `O CRAQUE da bola, o GÊNIO, LENDÁRIO *${array[0].nickname}* jogou aqui sim!
+    return `O CRAQUE, GÊNIO, LENDÁRIO *${array[0].nickname.toUpperCase()}* já jogou no Tigre! 🐯
 
-Nome completo: ${array[0].name}
-Nascimento: ${array[0].birthday} (${Number(thisYear) - Number(new Date(array[0].birthday).getFullYear())} anos)
-Foto: ${array[0].image}
+${array[0].period}
+Nome completo: ${array[0].name} (${array[0].position})
+Nascimento: ${array[0].birthday}
+Em ${thisYear} ele completou ${Number(thisYear) - Number(array[0].birthday.substring(6))} anos
 
-🥅 ${stats.matches} partidas
-👍 ${stats.w} vitórias
-🫳 ${stats.d} empates
-👎 ${stats.l} derrotas 
-🟨 ${stats.yc} cartão(ões) amarelo(s)
-🟥 ${stats.rc} cartão(ões) vermelho(s)
-⚽️ ${stats.goals} gols marcados
+🏟 ${stats.matches} partidas
+⚽️ ${stats.goals} gols
+👍🏽 ${stats.w} vitórias
+🤌🏽 ${stats.d} empates
+🖕🏽 ${stats.l} derrotas
+🟨 ${stats.yc} cartões amarelos
+🟥 ${stats.rc} cartões vermelhos
 
 Fonte: http://www.meutimenarede.com.br - Scraped by @devsakae`
   }
   let maisDeUm = `Encontrei mais de um atleta que jogou aqui! Se liga e escolha o certo:\n`
-  array.forEach((obj) => maisDeUm = maisDeUm.concat(`\n✅ ${obj.name} (${obj.nickname}), jogou ${obj.stats.matches} partidas`))
+  array.forEach((obj) => maisDeUm = maisDeUm.concat(`\n✅ ${obj.name} (${obj.position}): 🥅 ${obj.stats.matches} ⚽️ ${obj.stats.goals}`))
+  maisDeUm = maisDeUm.concat('\n\nFonte: http://www.meutimenarede.com.br - Scraped by @devsakae');
   return maisDeUm;
 }
 
@@ -131,7 +133,12 @@ async function commands(message, collection) {
     case '!jogounotigre':
       const atletasDoTigre = await tigrebot
         .collection('jogadores')
-        .find({ 'nickname': { $regex: content, $options: 'i' } })
+        .find({
+          $or: [
+            { 'nickname': { $regex: content, $options: 'i' } },
+            { 'name': { $regex: content, $options: 'i' } }
+          ]
+        })
         .toArray();
       if (atletasDoTigre.length > 0) return client.sendMessage(message.from, addStats(atletasDoTigre));
       return message.reply('Não jogou não 😒');
