@@ -77,7 +77,7 @@ Em ${thisYear} ele completou ${Number(thisYear) - Number(array[0].birthday.subst
 Fonte: http://www.meutimenarede.com.br - Scraped by @devsakae`
   }
   let maisDeUm = `Encontrei mais de um atleta que jogou aqui! Se liga e escolha o certo:\n`
-  array.forEach((obj) => maisDeUm = maisDeUm.concat(`\n✅ ${obj.name} (${obj.position}): 🥅 ${obj.stats.matches} ⚽️ ${obj.stats.goals}`))
+  array.forEach((obj) => maisDeUm = maisDeUm.concat(`\n✅ ${obj.name} (${obj.position}) - ${obj.stats.matches} jogos entre ${obj.period.substring(8)}`))
   maisDeUm = maisDeUm.concat('\n\nFonte: http://www.meutimenarede.com.br - Scraped by @devsakae');
   return maisDeUm;
 }
