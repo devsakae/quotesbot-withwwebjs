@@ -1,6 +1,7 @@
 const qrcode = require('qrcode-terminal');
-const { Client, MessageMedia } = require('whatsapp-web.js');
+const { Client } = require('whatsapp-web.js');
 const { MongoClient, ServerApiVersion } = require('mongodb');
+const ranking = require('./bolao/functions');
 const { config } = require('dotenv');
 config();
 
@@ -16,12 +17,13 @@ const mongoclient = new MongoClient(process.env.MONGODB_URI, {
 });
 const db = mongoclient.db('quotes');
 const tigrebot = mongoclient.db('tigrebot');
+const bolaodb = mongoclient.db('bolao');
 
 async function run() {
   try {
     await mongoclient.connect();
     await mongoclient
-      .db('admin')
+      .db('tigrebot')
       .command({ ping: 1 })
       .then((response) => {
         if (response) console.log('MongoDB: Conexão realizada!');
@@ -105,9 +107,26 @@ client.on('message', (message) => {
       commands(message, process.env.GROUP_2_NAME);
     message.from === process.env.GROUP_3_ID &&
       commands(message, process.env.GROUP_3_NAME);
+    // NEW: Sistema de bolão!
+    message.from === process.env.BOLAO_GROUP_ID && bolaoSystemFunc(message);
   }
   return;
 });
+
+async function bolaoSystemFunc(message) {
+  switch (message.body) {
+    case '!ranking':
+      console.log('Ranking solicitor');
+
+      return client.sendMessage(message.from, 'Você pediu o ranking')
+    case '!pausa':
+      console.log('Pausa solicitada');
+      return client.sendMessage(message.from, 'Você pediu uma pausa')
+    default:
+      console.log('Mensagem enviada:', message);
+      break;
+  }
+}
 
 async function commands(message, collection) {
   // Verifica se é pedido de quote aleatória e entrega
