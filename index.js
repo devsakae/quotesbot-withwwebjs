@@ -1,23 +1,15 @@
 const qrcode = require('qrcode-terminal');
 const { Client } = require('whatsapp-web.js');
-const { MongoClient, ServerApiVersion } = require('mongodb');
-const ranking = require('./bolao/functions');
+const { quoteFormat } = require('./src/quotes/functions');
+// const { MongoClient, ServerApiVersion } = require('mongodb');
+const { mongoclient } = require('./src/connection');
+const { ranking, novoBolao } = require('./src/bolao/functions');
 const { config } = require('dotenv');
 config();
 
 const client = new Client();
-
-// Configurações do MongoDB
-const mongoclient = new MongoClient(process.env.MONGODB_URI, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  },
-});
 const db = mongoclient.db('quotes');
 const tigrebot = mongoclient.db('tigrebot');
-const bolaodb = mongoclient.db('bolao');
 
 async function run() {
   try {
@@ -105,20 +97,23 @@ client.on('message', (message) => {
       commands(message, process.env.GROUP_1_NAME);
     message.from === process.env.GROUP_2_ID &&
       commands(message, process.env.GROUP_2_NAME);
-    message.from === process.env.GROUP_3_ID &&
-      commands(message, process.env.GROUP_3_NAME);
-    // NEW: Sistema de bolão!
-    message.from === process.env.BOLAO_GROUP_ID && bolaoSystemFunc(message);
+    // NEW: Sistema de bolão! EM FASE DE TESTES
+    message.from.includes(process.env.BOLAO_GROUP_ID) && bolaoSystemFunc(message);
   }
   return;
 });
 
+// NEW: Sistema de bolão!
 async function bolaoSystemFunc(message) {
+  if ((message.author === process.env.BOT_OWNER) && message.body === '!bolao start') {
+    const response = await novoBolao(0);
+    return client.sendMessage(message.from, response);
+
+  }
   switch (message.body) {
     case '!ranking':
-      console.log('Ranking solicitor');
-
-      return client.sendMessage(message.from, 'Você pediu o ranking')
+      const response = await ranking();
+      return client.sendMessage(message.from, response);
     case '!pausa':
       console.log('Pausa solicitada');
       return client.sendMessage(message.from, 'Você pediu uma pausa')
@@ -135,7 +130,7 @@ async function commands(message, collection) {
       .collection(collection)
       .aggregate([{ $sample: { size: 1 } }])
       .toArray();
-    return client.sendMessage(message.from, formatQuote(randomQuote[0]));
+    return client.sendMessage(message.from, quoteFormat(randomQuote[0]));
   }
 
   // Não é aleatória? Bora ver o que é
@@ -230,9 +225,6 @@ async function commands(message, collection) {
         gols: 1,
         topico: '(Mensagem no grupo)'
       };
-      await db
-        .collection('config_database')
-        .updateOne({}, { $inc: { [collection]: 1 } });
       const result = await db.collection(collection).insertOne(quote);
       message.reply(`✔️ Quote salva com id _${result.insertedId}_`);
       break;

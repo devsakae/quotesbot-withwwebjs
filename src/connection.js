@@ -1,4 +1,6 @@
 const { MongoClient, ServerApiVersion } = require('mongodb');
+const { config } = require('dotenv');
+config();
 
 // Configurações do MongoDB
 const mongoclient = new MongoClient(process.env.MONGODB_URI, {
@@ -9,7 +11,6 @@ const mongoclient = new MongoClient(process.env.MONGODB_URI, {
   },
 });
 
-const database = mongoclient.db('bolao');
-
-export default mongoclient;
-export { database } ;
+module.exports = {
+  mongoclient
+}
