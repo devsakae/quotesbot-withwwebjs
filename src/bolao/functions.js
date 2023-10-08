@@ -171,13 +171,13 @@ async function organizaPalpites(how) {
       .collection('palpites')
       .find({ jogo: Number(how.id) })
       .toArray();
-    const players = await database
+    const jogadores = await database
       .collection('jogadores')
       .find()
       .toArray();
     
     const sincronizado = palpites.map((palpite) => {
-      const temNome = players.find((player) => player.fone === palpite.fone)?.autor || palpite.autor;
+      const temNome = jogadores.find((jogador) => jogador.fone === palpite.fone)?.jogador || palpite.autor;
       return { ...palpite, autor: temNome };
     });
     let formatted = `⚽️ Palpites cadastrados (mandante x visitante):
