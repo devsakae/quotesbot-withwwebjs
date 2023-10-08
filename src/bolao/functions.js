@@ -176,15 +176,15 @@ async function organizaPalpites(how) {
       .find()
       .toArray();
     const sincronizado = palpites.map((palpite) => {
-      const temNome = jogadores.find((jogador) => jogador.fone === palpite.fone)?.jogador || palpite.fone;
+      const temNome = jogadores.find((jogador) => jogador.fone === palpite.fone)?.jogador || '@' + palpite.fone.substring(0, palpite.fone.indexOf('@'));
       return { ...palpite, autor: temNome };
     });
-    let formatted = `🎫 Palpites (autor):
+    let formatted = `🎫 Palpites cadastrados:
 `;
     sincronizado.map(
       (p) =>
         (formatted += `
-▪️ ${p.palpite.home} x ${p.palpite.away} (${p.autor})`),
+▪️ ${p.palpite.home} x ${p.palpite.away} - ${p.autor}`),
     );
     return formatted;
   }

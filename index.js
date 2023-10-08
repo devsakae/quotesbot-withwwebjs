@@ -4,7 +4,11 @@ const { quoteFormat } = require('./src/quotes/functions');
 const { mongoclient } = require('./src/connection');
 const { ranking, novoBolao, proximaPartida, checkResults, habilitaPalpite, habilitaJogador, organizaPalpites } = require('./src/bolao/functions');
 const { config } = require('dotenv');
+
 config();
+let botworking = true;
+let ouvindopalpites = false;
+let palpiters = [];
 
 const client = new Client({
   authStrategy: new LocalAuth(),
@@ -16,13 +20,15 @@ const database = mongoclient.db(process.env.BOLAO_GROUP_ID);
 async function run() {
   try {
     await mongoclient.connect();
-    await mongoclient
-      .db('tigrebot')
-      .command({ ping: 1 })
+    await database
+      .collection('palpites')
+      .find()
+      .toArray()
       .then((response) => {
         if (response) {
           console.log('MongoDB: Conexão realizada!');
-          console.log('Inicializando bot, aguarde...')
+          palpiters = response.map((palpite) => palpite.fone);
+          setTimeout(() => console.log('Inicializando bot, aguarde...'), 2200);
         }
       });
   } catch (err) {
@@ -40,10 +46,6 @@ client.on('ready', () => {
 });
 
 client.initialize();
-
-let botworking = true;
-let ouvindopalpites = false;
-let palpiters = [];
 
 const formatQuote = (quote) => {
   return `"${quote.quote}"
@@ -104,18 +106,22 @@ const luckyPhrases = [
   'Alguém dá um troféu pra esse maluco 🏆'
 ];
 
-client.on('message', (message) => {
+client.on('message', async (message) => {
   if (message.hasQuotedMsg && ouvindopalpites) {
-    if (palpiters.some((p) => p === message.author)) {
-      return message.reply('Nem vem, você já palpitou')
+    const quotedMessage = await message.getQuotedMessage();
+    if (quotedMessage.body.includes('Bolão aberto')) {
+      if (palpiters.some((p) => p === message.author)) {
+        await message.react('❌')
+        return message.reply('Já palpitou pô')
+      }
+      palpiters.push(message.author);
+      const regex = /\d+\s*[xX]\s*\d+/
+      if (regex.test(message.body)) {
+        habilitaPalpite(ouvindopalpites, message);
+        return message.react('✅');
+      }
     }
-    palpiters.push(message.author);
-    const regex = /\d+\s*[xX]\s*\d+/
-    if (regex.test(message.body)) {
-      habilitaPalpite(ouvindopalpites, message);
-      return message.reply(luckyPhrases[Math.floor(Math.random() * luckyPhrases.length)])
-    }
-    return message.reply('Aprende a dar palpite ô tapado 🙈')
+    return;
   }
   if (message.body === '!block' && message.author === process.env.BOT_OWNER) {
     botworking = false;
