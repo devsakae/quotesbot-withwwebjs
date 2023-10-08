@@ -175,12 +175,10 @@ async function organizaPalpites(how) {
       .collection('jogadores')
       .find()
       .toArray();
-    
     const sincronizado = palpites.map((palpite) => {
-      const temNome = jogadores.find((jogador) => jogador.fone === palpite.fone)?.jogador || palpite.autor;
+      const temNome = jogadores.find((jogador) => jogador.fone === palpite.fone)?.jogador || palpite.fone;
       return { ...palpite, autor: temNome };
     });
-    console.log(sincronizado);
     let formatted = `🎫 Palpites (autor):
 `;
     sincronizado.map(
