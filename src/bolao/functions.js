@@ -2,8 +2,26 @@ const { config } = require('dotenv');
 config();
 const axios = require('axios');
 const { mongoclient } = require('../connection');
-const { rankingmock } = require('../../tests/mock');
 const database = mongoclient.db(process.env.BOLAO_GROUP_ID);
+
+function forMatch(match) {
+  const data = new Date(match.startTimestamp * 1000);
+  return `🚨🚨 Bolão aberto para *${match.homeTeam}* x *${match.awayTeam}* 🚨🚨
+
+🗓 Data: ${data.toLocaleString('pt-br')}
+
+❓ *COMO JOGAR*: Responda essa mensagem com apenas seu palpite, no formato "${match.homeTeam} 2 x 1 ${match.awayTeam}".
+
+🛑 Atenção: Este é um sistema de teste, portanto pode haver alguns BUGs. Caso isso aconteça, favor reportar ao dono do Bot.
+
+ℹ️ *REGRAS*: Palpites válidos somente se enviados até ${process.env.BOLAO_LIMITE_EM_MINUTOS} minutos antes da partida.
+  ✅ Placar em cheio: *3 pontos*
+  ✅ Vitória, empate ou derrota: *1 ponto*
+  ✅ Acertar o placar de um dos times: *Ponto extra!*
+
+Boa sorte!
+Sistema de bolão hiper mega 🔝 desenvolvido por devsakae.tech`;
+}
 
 async function fetchData(url) {
   try {
@@ -27,46 +45,40 @@ async function novoBolao(i) {
     await database
       .collection('jogos')
       .insertMany(response.events);
-    if (response.hasNextPage) return setTimeout(() => novoBolao(i++), 1000);
-    else return `Bolão do *${response.events[0].tournament.name}* criado! BORA PALPITAR? Admin, libera o próximo jogo aí! Digite !`
+    if (response.hasNextPage) return setTimeout(() => novoBolao(i + 1), 1000);
+    else return { code: 200, message: `Bolão do *${response.events[0].tournament.name}* criado. Boa sorte aos competidores!` }
   } catch (err) {
     console.error(err);
+    return { code: 500, message: err };
   }
 }
 
-async function abreJogo() {
-  const today = new Date();
-  const event_api_date = '08/10/2023'; // today.toISOString().substring(0,10).split('-').reverse().join('/')
+async function proximaPartida() {
   try {
-    const response = await fetchData(process.env.BOLAO_RAPIDAPI_URL + '/category/' + process.env.BOLAO_RAPIDAPI_BRASILID + '/events/' + event_api_date)
-    const { events } = response.data;
-    const jogosDoTigre = events.filter((item) => (item.homeTeam.id === Number(process.env.BOLAO_RAPIDAPI_CLUBID) || item.awayTeam.id === Number(process.env.BOLAO_RAPIDAPI_CLUBID) && (item.tournament.id === process.env.BOLAO_RAPIDAPI_TOURNAMENTID)));
-    if (events.length > 1) throw Error('Foi encontrado mais de 1 jogo cadastrado para a data informada (${event_api_date}). Ajuste as configurações');
-    const gameDate = new Date(jogosDoTigre[0].startTimestamp * 1000);
-    const diff = (gameDate.getTime() - today.getTime()) + 180000;
-    // Trigger to check results in 3 hours after game start
-    setTimeout(() => {
-      checkResults(jogosDoTigre[0].id)
-    }, diff)
-    return {
-      id: jogosDoTigre[0].id,
-      status: jogosDoTigre[0].status.description,
-      homeTeam: jogosDoTigre[0].homeTeam.name,
-      awayTeam: jogosDoTigre[0].awayTeam.name,
-      gameDate: gameDate,
-      tournament: jogosDoTigre[0].tournament.name,
-      round: jogosDoTigre[0].roundInfo.round,
+    const today = new Date();
+    const todayStamp = Math.floor(today.getTime() / 1000);
+    const match = await database
+    .collection('jogos')
+    .findOne({ startTimestamp: { $gt: todayStamp } });
+    if (match) {
+      const timeoutms = ((match.startTimestamp - todayStamp) - (60 * process.env.BOLAO_LIMITE_EM_MINUTOS)) * 1000;
+      const trigger = { id: match.id, schedule: timeoutms };
+      const message = forMatch(match);
+      return { code: 200, trigger: trigger, message: message }
     }
+    return { code: 404 }
   } catch (err) {
     console.error(err);
+    return { code: 500, message: err }
   }
-}
+};
 
 async function checkResults(id) {
   try {
     const response = await fetchData(process.env.BOLAO_RAPIDAPI_URL + '/match/' + id)
     const { event } = response;
     console.log(event);
+    return event;
   } catch (err) {
     console.error(err);
   }
@@ -92,7 +104,7 @@ async function ranking() {
 
 
 module.exports = {
-  abreJogo,
+  proximaPartida,
   novoBolao,
   habilitarPalpite,
   ranking,

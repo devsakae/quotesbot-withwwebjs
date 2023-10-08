@@ -3,7 +3,7 @@ const { Client } = require('whatsapp-web.js');
 const { quoteFormat } = require('./src/quotes/functions');
 // const { MongoClient, ServerApiVersion } = require('mongodb');
 const { mongoclient } = require('./src/connection');
-const { ranking, novoBolao } = require('./src/bolao/functions');
+const { ranking, novoBolao, proximaPartida, checkResults } = require('./src/bolao/functions');
 const { config } = require('dotenv');
 config();
 
@@ -103,12 +103,26 @@ client.on('message', (message) => {
   return;
 });
 
+async function confereResultado(to, id) {
+  // Confere resultado da partida id;
+  const response = await checkResults(id);
+  client.sendMessage(to, response);
+}
+
 // NEW: Sistema de bolão!
 async function bolaoSystemFunc(message) {
   if ((message.author === process.env.BOT_OWNER) && message.body === '!bolao start') {
     const response = await novoBolao(0);
-    return client.sendMessage(message.from, response);
-
+    console.log('response novo bolao', response);
+    if (response.code === 500) return client.sendMessage(process.env.BOT_OWNER, response.error)
+    client.sendMessage(message.from, response.message);
+    const newResponse = await proximaPartida();
+    console.log('response proxima partida', newResponse);
+    if (newResponse.code === 500) return client.sendMessage(process.env.BOT_OWNER, newResponse.error);
+    if (newResponse.code === 404) return client.sendMessage(process.env.BOT_OWNER, 'Nenhum jogo encontrado! Tem calendário aberto?');
+    () => clearTimeout();
+    setTimeout(() => confereResultado(message.from, newResponse.trigger.id), newResponse.trigger.schedule);
+    return client.sendMessage(message.from, newResponse.message);
   }
   switch (message.body) {
     case '!ranking':
