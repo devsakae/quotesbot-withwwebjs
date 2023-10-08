@@ -180,13 +180,13 @@ async function organizaPalpites(how) {
       const temNome = jogadores.find((jogador) => jogador.fone === palpite.fone)?.jogador || palpite.autor;
       return { ...palpite, autor: temNome };
     });
-    let formatted = `⚽️ Palpites cadastrados (mandante x visitante):
-
+    console.log(sincronizado);
+    let formatted = `🎫 Palpites (autor):
 `;
     sincronizado.map(
       (p) =>
-        (formatted += `▪️ ${p.palpite.home} x ${p.palpite.away} (${p.autor})
-`),
+        (formatted += `
+▪️ ${p.palpite.home} x ${p.palpite.away} (${p.autor})`),
     );
     return formatted;
   }

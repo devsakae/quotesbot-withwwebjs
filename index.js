@@ -20,7 +20,10 @@ async function run() {
       .db('tigrebot')
       .command({ ping: 1 })
       .then((response) => {
-        if (response) console.log('MongoDB: Conexão realizada!');
+        if (response) {
+          console.log('MongoDB: Conexão realizada!');
+          console.log('Inicializando bot, aguarde...')
+        }
       });
   } catch (err) {
     console.error(err);
@@ -33,7 +36,7 @@ client.on('qr', (qr) => {
 });
 
 client.on('ready', () => {
-  console.log('Bot rodando!');
+  console.log('Bot inicializado!');
 });
 
 client.initialize();
