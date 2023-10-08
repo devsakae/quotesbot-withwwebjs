@@ -1,15 +1,17 @@
 const qrcode = require('qrcode-terminal');
-const { Client } = require('whatsapp-web.js');
+const { Client, LocalAuth } = require('whatsapp-web.js');
 const { quoteFormat } = require('./src/quotes/functions');
-// const { MongoClient, ServerApiVersion } = require('mongodb');
 const { mongoclient } = require('./src/connection');
-const { ranking, novoBolao, proximaPartida, checkResults } = require('./src/bolao/functions');
+const { ranking, novoBolao, proximaPartida, checkResults, habilitaPalpite, habilitaJogador } = require('./src/bolao/functions');
 const { config } = require('dotenv');
 config();
 
-const client = new Client();
+const client = new Client({
+  authStrategy: new LocalAuth(),
+});
 const db = mongoclient.db('quotes');
 const tigrebot = mongoclient.db('tigrebot');
+const database = mongoclient.db(process.env.BOLAO_GROUP_ID);
 
 async function run() {
   try {
@@ -37,6 +39,7 @@ client.on('ready', () => {
 client.initialize();
 
 let botworking = true;
+let ouvindopalpites = false;
 
 const formatQuote = (quote) => {
   return `"${quote.quote}"
@@ -83,7 +86,25 @@ const bestQuote = (array) => {
   return formatQuote(scoredQuotes[0]);
 }
 
+const adminWarning = (problem) => {
+  return client.sendMessage(process.env.BOT_OWNER, problem)
+}
+
+let palpiters = [];
+
 client.on('message', (message) => {
+  if (message.hasQuotedMsg && ouvindopalpites) {
+    if (palpiters.some((p) => p === message.author)) {
+      return message.reply('Nem vem, você já palpitou')
+    }
+    palpiters.push(message.author);
+    const regex = /\d+\s*[xX]\s*\d+/
+    if (regex.test(message.body)) {
+      const response = habilitaPalpite(ouvindopalpites, message);
+      return message.reply(response)
+    }
+    return message.reply('Aprende a dar palpite ô tapado 🙈')
+  }
   if (message.body === '!block' && message.author === process.env.BOT_OWNER) {
     botworking = false;
     return client.sendMessage(message.from, 'Entrei de férias 😎 🏖');
@@ -103,38 +124,56 @@ client.on('message', (message) => {
   return;
 });
 
+// NEW: Sistema de bolão!
 async function confereResultado(to, id) {
   // Confere resultado da partida id;
   const response = await checkResults(id);
   client.sendMessage(to, response);
 }
 
-// NEW: Sistema de bolão!
+async function encerraPalpite(to, id) {
+  ouvindopalpites = false;
+  palpiters = [];
+  const arrayDePalpites = await organizaPalpites(id);
+  let response = '⚽️ Lista dos palpiteiros para a partida de logo mais%0A%0A'
+  arrayDePalpites.map((p) => response += `->`)
+  client.sendMessage(to, response);
+  return;
+}
+
 async function bolaoSystemFunc(message) {
   if ((message.author === process.env.BOT_OWNER) && message.body === '!bolao start') {
+    await database.collection(process.env.BOLAO_RAPIDAPI_CLUBID).drop();
     const response = await novoBolao(0);
-    console.log('response novo bolao', response);
-    if (response.code === 500) return client.sendMessage(process.env.BOT_OWNER, response.error)
+    if (response.code === 500) return adminWarning(response.error);
     client.sendMessage(message.from, response.message);
+
     const newResponse = await proximaPartida();
-    console.log('response proxima partida', newResponse);
-    if (newResponse.code === 500) return client.sendMessage(process.env.BOT_OWNER, newResponse.error);
-    if (newResponse.code === 404) return client.sendMessage(process.env.BOT_OWNER, 'Nenhum jogo encontrado! Tem calendário aberto?');
+    if (newResponse.code === 500) return adminWarning(newResponse.error);
+    if (newResponse.code === 404) return adminWarning(newResponse.message);
+    ouvindopalpites = newResponse?.trigger.id;
     () => clearTimeout();
-    setTimeout(() => confereResultado(message.from, newResponse.trigger.id), newResponse.trigger.schedule);
+    const triggerImpedimento = setTimeout(() => encerraPalpite(message.from, newResponse.trigger.id), newResponse.trigger.timeoutms);
     return client.sendMessage(message.from, newResponse.message);
+  }
+  if (message.body.startsWith('!habilitar')) {
+    const habilitado = await habilitaJogador(message);
+    if (habilitado.code === 500) return adminWarning(habilitado.message);
+    if (habilitado.code === 401) return client.sendMessage(message.author, 'Você já está habilitado');
+    return client.sendMessage(message.author, `Olá, ${habilitado?.username}!
+  
+Você foi habilitado para o bolão (em fase de testes).
+
+Siga as regras e boa sorte 👊`);
   }
   switch (message.body) {
     case '!ranking':
       const response = await ranking();
       return client.sendMessage(message.from, response);
-    case '!pausa':
-      console.log('Pausa solicitada');
-      return client.sendMessage(message.from, 'Você pediu uma pausa')
     default:
-      console.log('Mensagem enviada:', message);
       break;
   }
+  return;
 }
 
 async function commands(message, collection) {
