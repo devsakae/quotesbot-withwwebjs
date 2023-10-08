@@ -113,10 +113,6 @@ async function habilitaPalpite(id, message) {
   const homeScore = Number(placar[0].trim());
   const awayScore = Number(placar[1].trim())
   await database.collection('palpites').insertOne({ autor: message.author, jogo: Number(id), palpite: { home: homeScore, away: awayScore } });
-  const header = (homeScore > awayScore) ? '👉 *Vitória* do mandante com placar de' : (homeScore < awayScore) ? '👉 *Derrota* do mandante pelo placar de' : '👉 *Empate* em';
-  header.concat(homeScore + ' x ' + awayScore);
-  const lucky = luckyPhrases[Math.floor(Math.random() * luckyPhrases.length)] + '%0A';
-  return header + '%0A' + lucky
 }
 
 async function organizaPalpites(id) {

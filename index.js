@@ -90,6 +90,16 @@ const adminWarning = (problem) => {
   return client.sendMessage(process.env.BOT_OWNER, problem)
 }
 
+const luckyPhrases = [
+  '🤞 dedinhos cruzadosssss',
+  'Só vai! Boa sorte',
+  'É O BONDE DO TIGRÃO 🐯 GRAUR',
+  '🙊',
+  'Muito, mas muiiiiiiito boa sorte pra você e pra toda sua família',
+  '🍀 segue o trevo da sorte do Gastão com esse palpite ae',
+  'Alguém dá um troféu pra esse maluco 🏆'
+];
+
 let palpiters = [];
 
 client.on('message', (message) => {
@@ -100,8 +110,8 @@ client.on('message', (message) => {
     palpiters.push(message.author);
     const regex = /\d+\s*[xX]\s*\d+/
     if (regex.test(message.body)) {
-      const response = habilitaPalpite(ouvindopalpites, message);
-      return message.reply(response)
+      habilitaPalpite(ouvindopalpites, message);
+      return message.reply(luckyPhrases[Math.floor(Math.random() * luckyPhrases.length)])
     }
     return message.reply('Aprende a dar palpite ô tapado 🙈')
   }
