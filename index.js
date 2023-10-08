@@ -2,7 +2,7 @@ const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const { quoteFormat } = require('./src/quotes/functions');
 const { mongoclient } = require('./src/connection');
-const { ranking, novoBolao, proximaPartida, checkResults, habilitaPalpite, habilitaJogador } = require('./src/bolao/functions');
+const { ranking, novoBolao, proximaPartida, checkResults, habilitaPalpite, habilitaJogador, organizaPalpites } = require('./src/bolao/functions');
 const { config } = require('dotenv');
 config();
 
@@ -40,6 +40,7 @@ client.initialize();
 
 let botworking = true;
 let ouvindopalpites = false;
+let palpiters = [];
 
 const formatQuote = (quote) => {
   return `"${quote.quote}"
@@ -93,14 +94,12 @@ const adminWarning = (problem) => {
 const luckyPhrases = [
   '🤞 dedinhos cruzadosssss',
   'Só vai! Boa sorte',
+  'Sério? 🙊',
   'É O BONDE DO TIGRÃO 🐯 GRAUR',
-  '🙊',
   'Muito, mas muiiiiiiito boa sorte pra você e pra toda sua família',
   '🍀 segue o trevo da sorte do Gastão com esse palpite ae',
   'Alguém dá um troféu pra esse maluco 🏆'
 ];
-
-let palpiters = [];
 
 client.on('message', (message) => {
   if (message.hasQuotedMsg && ouvindopalpites) {
@@ -124,47 +123,64 @@ client.on('message', (message) => {
     return message.reply('Tô na área');
   }
   if (message.body.startsWith('!') && botworking) {
-    message.from === process.env.GROUP_1_ID &&
-      commands(message, process.env.GROUP_1_NAME);
-    message.from === process.env.GROUP_2_ID &&
-      commands(message, process.env.GROUP_2_NAME);
     // NEW: Sistema de bolão! EM FASE DE TESTES
     message.from.includes(process.env.BOLAO_GROUP_ID) && bolaoSystemFunc(message);
+    // message.from === process.env.GROUP_1_ID &&
+    //   commands(message, process.env.GROUP_1_NAME);
+    message.from === process.env.GROUP_2_ID &&
+      commands(message, process.env.GROUP_2_NAME);
   }
+  if (message.from === process.env.BOT_OWNER) bolaoSystemFunc(message);
   return;
 });
 
 // NEW: Sistema de bolão!
+// Criado em outubro de 2023 por devsakae.tech
+
+// Função que checa o resultado de uma partida e manda para o canal
 async function confereResultado(to, id) {
-  // Confere resultado da partida id;
   const response = await checkResults(id);
   client.sendMessage(to, response);
 }
 
+// Função que bloqueia novos palpites por expiração do prazo
 async function encerraPalpite(to, id) {
   ouvindopalpites = false;
   palpiters = [];
-  const arrayDePalpites = await organizaPalpites(id);
-  let response = '⚽️ Lista dos palpiteiros para a partida de logo mais%0A%0A'
-  arrayDePalpites.map((p) => response += `->`)
-  client.sendMessage(to, response);
+  const listaDePalpites = await organizaPalpites({ method: 'jogo', id: id });
+  client.sendMessage(to, listaDePalpites);
   return;
 }
 
+// Escutador de comandos do bolão
 async function bolaoSystemFunc(message) {
-  if ((message.author === process.env.BOT_OWNER) && message.body === '!bolao start') {
+  if (message.from === process.env.BOT_OWNER && message.body === '/bolao start') {
     await database.collection(process.env.BOLAO_RAPIDAPI_CLUBID).drop();
     const response = await novoBolao(0);
     if (response.code === 500) return adminWarning(response.error);
-    client.sendMessage(message.from, response.message);
-
-    const newResponse = await proximaPartida();
-    if (newResponse.code === 500) return adminWarning(newResponse.error);
-    if (newResponse.code === 404) return adminWarning(newResponse.message);
-    ouvindopalpites = newResponse?.trigger.id;
-    () => clearTimeout();
-    const triggerImpedimento = setTimeout(() => encerraPalpite(message.from, newResponse.trigger.id), newResponse.trigger.timeoutms);
-    return client.sendMessage(message.from, newResponse.message);
+    client.sendMessage(process.env.BOLAO_GROUP_ID + '@g.us', response.message);
+  }
+  if (message.author === process.env.BOT_OWNER) {
+    switch (message.body) {
+      case '!bolao':
+        if (ouvindopalpites) return adminWarning('Bolão já está em andamento!');
+        const newResponse = await proximaPartida();
+        if (newResponse.code === 500) return adminWarning(newResponse.error);
+        if (newResponse.code === 404) return adminWarning(newResponse.message);
+        ouvindopalpites = newResponse?.trigger.id;
+        () => clearTimeout();
+        const triggerImpedimento = setTimeout(() => encerraPalpite(message.from, newResponse.trigger.id), newResponse.trigger.timeoutms);
+        return client.sendMessage(message.from, newResponse.message);
+      case '!palpites':
+        const miniRanking = await organizaPalpites({ method: 'jogo', id: ouvindopalpites });
+        client.sendMessage(message.from, miniRanking);
+        break;
+      case '!ranking':
+        const response = await ranking();
+        return client.sendMessage(message.from, response);
+      default:
+        break;
+    }  
   }
   if (message.body.startsWith('!habilitar')) {
     const habilitado = await habilitaJogador(message);
@@ -175,13 +191,6 @@ async function bolaoSystemFunc(message) {
 Você foi habilitado para o bolão (em fase de testes).
 
 Siga as regras e boa sorte 👊`);
-  }
-  switch (message.body) {
-    case '!ranking':
-      const response = await ranking();
-      return client.sendMessage(message.from, response);
-    default:
-      break;
   }
   return;
 }
