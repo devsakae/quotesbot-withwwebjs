@@ -163,8 +163,12 @@ async function bolaoSystemFunc(message) {
   if (message.author === process.env.BOT_OWNER) {
     switch (message.body) {
       case '!bolao':
-        if (ouvindopalpites) return adminWarning('Bolão já está em andamento!');
         const newResponse = await proximaPartida();
+        if (ouvindopalpites) {
+          () => clearTimeout();
+          const triggerImpedimento = setTimeout(() => encerraPalpite(message.from, newResponse.trigger.id), newResponse.trigger.timeoutms);
+          return adminWarning('Bolão em andamento!');
+        }
         if (newResponse.code === 500) return adminWarning(newResponse.error);
         if (newResponse.code === 404) return adminWarning(newResponse.message);
         ouvindopalpites = newResponse?.trigger.id;
@@ -186,11 +190,7 @@ async function bolaoSystemFunc(message) {
     const habilitado = await habilitaJogador(message);
     if (habilitado.code === 500) return adminWarning(habilitado.message);
     if (habilitado.code === 401) return client.sendMessage(message.author, 'Você já está habilitado');
-    return client.sendMessage(message.author, `Olá, ${habilitado?.username}!
-  
-Você foi habilitado para o bolão (em fase de testes).
-
-Siga as regras e boa sorte 👊`);
+    return client.sendMessage(message.author, habilitado.message);
   }
   return;
 }

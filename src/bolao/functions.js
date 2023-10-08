@@ -74,9 +74,9 @@ async function novoBolao(i) {
     } else
       return {
         code: 200,
-        message: `Bolão do *${response.events[0].tournament.name}* criado.
+        message: `Bolão do *${response.events[0].tournament.name}* criado!
     
-Registre seu apelido com *!habilitar [seu nome/apelido]* (máx. 20 caracteres)!`,
+Registre seu apelido com *!habilitar [seu nome/apelido]* (máx. 20 caracteres).`,
       };
   } catch (err) {
     console.error(err);
@@ -103,8 +103,19 @@ async function habilitaJogador(message) {
       });
     await database
       .collection('palpites')
-      .updateMany({ autor: message.author }, { $set: { autor: username } });
-    return { code: 201, username: username };
+      .updateMany({ fone: message.author }, { $set: { jogador: username } });
+    return { code: 201, message: `Olá, ${username}!
+
+Você está habilitado para o bolão (em fase de testes).
+
+ℹ️ *REGRAS*: Palpites válidos somente se enviados até ${process.env.BOLAO_LIMITE_EM_MINUTOS} minutos antes da partida.
+
+✅ Placar em cheio: *3 pontos*
+✅ Vitória, empate ou derrota: *1 ponto*
+✅ Acertar o placar de um dos times: *Ponto extra!*
+
+Boa sorte!
+Sistema de bolão hiper mega 🔝 desenvolvido por devsakae.tech` };
   } catch (err) {
     console.error(err);
     return { code: 500, message: err };
@@ -148,7 +159,7 @@ async function habilitaPalpite(id, message) {
   await database
     .collection('palpites')
     .insertOne({
-      autor: message.author,
+      fone: message.author,
       jogo: Number(id),
       palpite: { home: homeScore, away: awayScore, resultado: resultado },
     });
@@ -164,14 +175,18 @@ async function organizaPalpites(how) {
       .collection('jogadores')
       .find()
       .toArray();
-    const sincronizado = palpites.map((palpite) => ({ ...palpite, autor: players.find((player) => player.fone === palpite.autor).jogador }));
+    
+    const sincronizado = palpites.map((palpite) => {
+      const temNome = players.find((player) => player.fone === palpite.fone)?.autor || palpite.autor;
+      return { ...palpite, autor: temNome };
+    });
     let formatted = `⚽️ Palpites cadastrados (mandante x visitante):
 
 `;
     sincronizado.map(
       (p) =>
         (formatted += `▪️ ${p.palpite.home} x ${p.palpite.away} (${p.autor})
-  `),
+`),
     );
     return formatted;
   }
