@@ -2,13 +2,14 @@ const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const { quoteFormat } = require('./src/quotes/functions');
 const { mongoclient } = require('./src/connection');
-const { ranking, novoBolao, proximaPartida, checkResults, habilitaPalpite, habilitaJogador, organizaPalpites } = require('./src/bolao/functions');
+const { novoBolao, proximaPartida, checkResults, habilitaPalpite, habilitaJogador, organizaPalpites, buscaIdAtivo, organizaRanking } = require('./src/bolao/functions');
 const { config } = require('dotenv');
 
 config();
 let botworking = true;
 let ouvindopalpites = false;
 let palpiters = [];
+let memoryRanking = [];
 
 const client = new Client({
   authStrategy: new LocalAuth(),
@@ -27,7 +28,7 @@ async function run() {
       .then((response) => {
         if (response) {
           console.log('MongoDB: Conexão realizada!');
-          palpiters = response.map((palpite) => palpite.fone);
+          palpiters = response?.map((palpite) => palpite.fone);
           setTimeout(() => console.log('Inicializando bot, aguarde...'), 2200);
         }
       });
@@ -118,7 +119,7 @@ client.on('message', async (message) => {
       const regex = /\d+\s*[xX]\s*\d+/
       if (regex.test(message.body)) {
         habilitaPalpite(ouvindopalpites, message);
-        return message.react('✅');
+        Math.floor(Math.random() * 1) === 1 ? message.react('✅') : message.reply(luckyPhrases[Math.floor(Math.random() * luckyPhrases.length)]);
       }
     }
     return;
@@ -147,17 +148,44 @@ client.on('message', async (message) => {
 // Criado em outubro de 2023 por devsakae.tech
 
 // Função que checa o resultado de uma partida e manda para o canal
-async function confereResultado(to, id) {
-  const response = await checkResults(id);
-  client.sendMessage(to, response);
+async function confereResultado(to) {
+  try {
+    const idResponse = await buscaIdAtivo();
+    if (idResponse.code === 404) {
+      const response = organizaRanking(memoryRanking);
+      return client.sendMessage(to, response);
+    }
+    if (idResponse.code === 500) return adminWarning(idResponse.message)
+    const rankingDoJogo = await checkResults(idResponse.id);
+    memoryRanking = rankingDoJogo.sort((a, b) => a.pontos < b.pontos ? 1 : (a.pontos > b.pontos) ? -1 : 0);
+    let response = `🏆 Resultado do bolão da última partida 🏆
+  
+🥇 ${memoryRanking[0].autor} apostou *${memoryRanking[0].palpite}* (${memoryRanking[0].pontos} pontos)
+🥈 ${memoryRanking[1].autor} apostou *${memoryRanking[1].palpite}* (${memoryRanking[1].pontos} pontos)
+🥉 ${memoryRanking[2].autor} apostou *${memoryRanking[2].palpite}* (${memoryRanking[2].pontos} pontos)
+--------\n`;
+    const memoryRankingRest = memoryRanking.slice(3);
+    memoryRankingRest.map((rest) => response += `${rest.autor} apostou ${rest.palpite} (${rest.pontos} pontos)\n`)
+    response += '\nUsuários sem nome na lista enviem *!habilitar Nome ou apelido* para se cadastrar 👍';
+    await database.collection('palpites').drop();
+    await database.createCollection('palpites');
+    return client.sendMessage(to, response);
+  } catch (err) {
+    console.error(err);
+    return adminWarning(err);
+  }
 }
 
 // Função que bloqueia novos palpites por expiração do prazo
-async function encerraPalpite(to, id) {
-  ouvindopalpites = false;
+async function encerraPalpite(message) {
   palpiters = [];
+  const encerramento = '⛔️⛔️ Tempo esgotado! ⛔️⛔️\n\n'
   const listaDePalpites = await organizaPalpites({ method: 'jogo', id: id });
-  client.sendMessage(to, listaDePalpites);
+  client.sendMessage(to, encerramento + listaDePalpites);
+  const hours = 4;
+  const hoursInMs = hours * (60 * 60 * 1000);
+  const agendaVerificacao = setTimeout(() => confereResultado(message.from), hoursInMs)
+  ouvindopalpites = false;
   return;
 }
 
@@ -166,7 +194,7 @@ async function bolaoSystemFunc(message) {
   if (message.from === process.env.BOT_OWNER && message.body === '/bolao start') {
     await database.collection(process.env.BOLAO_RAPIDAPI_CLUBID).drop();
     const response = await novoBolao(0);
-    if (response.code === 500) return adminWarning(response.error);
+    if (response.code === 500) return adminWarning(response.message);
     client.sendMessage(process.env.BOLAO_GROUP_ID + '@g.us', response.message);
   }
   if (message.author === process.env.BOT_OWNER) {
@@ -189,8 +217,9 @@ async function bolaoSystemFunc(message) {
         client.sendMessage(message.from, miniRanking);
         break;
       case '!ranking':
-        const response = await ranking();
-        return client.sendMessage(message.from, response);
+        if (ouvindopalpites) return message.reply('Ranking trancado porque estou recebendo palpites pra próxima partida do bolão');
+        confereResultado(message.from);
+        break;
       default:
         break;
     }  
@@ -198,7 +227,8 @@ async function bolaoSystemFunc(message) {
   if (message.body.startsWith('!habilitar')) {
     const habilitado = await habilitaJogador(message);
     if (habilitado.code === 500) return adminWarning(habilitado.message);
-    if (habilitado.code === 401) return client.sendMessage(message.author, 'Você já está habilitado');
+    if (habilitado.code === 401) return message.reply(`Você está habilitado como ${habilitado.message}`);
+    message.react('🎟');
     return client.sendMessage(message.author, habilitado.message);
   }
   return;

@@ -4,27 +4,13 @@ const axios = require('axios');
 const { mongoclient } = require('../connection');
 const database = mongoclient.db(process.env.BOLAO_GROUP_ID);
 
-const luckyPhrases = [
-  '🤞 dedinhos cruzadosssss',
-  'Só vai! Boa sorte',
-  'É O BONDE DO TIGRÃO 🐯 GRAUR',
-  '🙊',
-  'Muito, mas muiiiiiiito boa sorte pra você e pra toda sua família',
-  '🍀 segue o trevo da sorte do Gastão com esse palpite ae',
-  'Alguém dá um troféu pra esse maluco 🏆',
-];
-
 function forMatch(match) {
   const data = new Date(match.startTimestamp * 1000);
-  return `🚨🚨 Bolão aberto para *${match.homeTeam.name}* x *${
-    match.awayTeam.name
-  }* 🚨🚨
+  return `🚨🚨 Bolão aberto 🚨🚨
+  
+Registre seu palpite para *${match.homeTeam.name}* x *${match.awayTeam.name}* que vai acontecer ${data.toLocaleString('pt-br')}
 
-🗓 Data e hora da partida: *${data.toLocaleString('pt-br')}*
-
-❓ *COMO JOGAR*: Responda essa mensagem com apenas seu palpite, no formato "${
-    match.homeTeam.name
-  } 2 x 1 ${match.awayTeam.name}".
+❓ *COMO JOGAR*: Responda essa mensagem com apenas seu palpite, no formato *MANDANTE SCORE x SCORE VISITANTE* (ex.: ${match.homeTeam.name} 1 x 2 ${match.awayTeam.name}).
 
 🛑 Atenção: Este é um sistema de teste, portanto pode haver alguns BUGs. Caso isso aconteça, favor reportar ao dono do Bot.
 
@@ -150,6 +136,8 @@ async function proximaPartida() {
 }
 
 async function habilitaPalpite(id, message) {
+  const username = await database.collection('jogadores').findOne({ fone: message.author }) || message.author;
+  console.log(username);
   const regex = /\d+\s*[xX]\s*\d+/;
   let placar = message.body.match(regex)[0].split('x');
   if (placar.length < 2) placar = message.body.match(regex[0].split('X'));
@@ -161,6 +149,7 @@ async function habilitaPalpite(id, message) {
     .insertOne({
       fone: message.author,
       jogo: Number(id),
+      autor: username,
       palpite: { home: homeScore, away: awayScore, resultado: resultado },
     });
 }
@@ -192,49 +181,59 @@ async function organizaPalpites(how) {
 }
 
 async function checkResults(id) {
-  console.log('Entrou em check results por id');
   try {
-    const { event } = await fetchData(
-      process.env.BOLAO_RAPIDAPI_URL + '/match/' + id,
-    );
-    const homeScore = event.homeScore.current;
-    const awayScore = event.awayScore.current;
-    const resultado = Number(event.homeScore.current) > Number(event.awayScore.current) ? 'V' : Number(event.homeScore.current) < Number(event.awayScore.current) ? 'D' : 'E';
+    const gameInfo = await fetchData(process.env.BOLAO_RAPIDAPI_URL + '/match/' + id);
+    const homeScore = gameInfo.event.homeScore.current;
+    const awayScore = gameInfo.event.awayScore.current;
+    const resultado = Number(gameInfo.event.homeScore.current) > Number(gameInfo.event.awayScore.current) ? 'V' : Number(gameInfo.event.homeScore.current) < Number(gameInfo.event.awayScore.current) ? 'D' : 'E';
     const palpitesdb = await database
       .collection('palpites')
       .find({ jogo: Number(id) })
       .toArray();
     const rankingDoJogo = palpitesdb.map((p) => {
-      let resPos = { autor: p.autor, pontos: 0, palpite: p.palpite.home + ' x ' + p.palpite.away }
+      let temNome = p.autor || p.fone.slice(0, -5);
+      let resPos = { autor: temNome, pontos: 0, palpite: p.palpite.home + ' x ' + p.palpite.away }
       if (p.palpite.home === homeScore && p.palpite.away === awayScore) {
         resPos.pontos += 3;
         return resPos;
       }
       if (p.palpite.resultado === resultado) resPos.pontos += 1;
       if (p.palpite.home === homeScore || p.palpite.away === awayScore) resPos.pontos += 1;
-      return resPos
+      return resPos;
     });
-    // Verifica o ranking do jogo
-    console.log(rankingDoJogo);
-    rankingDoJogo.sort((a, b) => a.pontos + b.pontos);
-    let response = 'Jogo finalizado! Confira o ranking:%0A%0A'
-    rankingDoJogo.map((item) => response += `${item.autor} fez *${item.pontos} pontos* com o placar ${item.palpite}%0A`)
-    return response;
+    palpitesdb.map((p) => {
+      database.collection('jogadores').findOneAndUpdate({ fone: p.fone }, { $push: { historico: { jogo: Number(id), palpite: p.palpite } } }, { upsert: true });
+    });
+    return rankingDoJogo;
   } catch (err) {
     console.error(err);
+    return { code: 500, message: err }
   }
 }
 
-async function ranking() {
-  //   rankingmock.sort((a, b) => a.pts + b.pts);
-  //   const response_header = `Ranking do bolão 2023!
-  // Site oficial do bolão: https://bolao.devsakae.tech
-  // Top *${process.env.BOLAO_RANKING_TOP}* melhores palpiteiros do grupo:
-  // 🥇 ${rankingmock[0].name}
-  // 🥈 ${rankingmock[1].name}
-  // 🥉 ${rankingmock[2].name}`
-  //   response_header += `🏅`
-  //   return response_header;
+async function buscaIdAtivo() {
+  try {
+    const response = await database.collection('palpites').findOne();
+    if (!response) return { code: 404 };
+    const id = response.jogo; 
+    return { code: 200, id: Number(id) };
+  } catch (err) {
+    console.error(err);
+    return { code: 500, message: err };
+  }
+}
+
+function organizaRanking(array) {
+  const sortedRanking = array.sort((a, b) => a.pontos < b.pontos ? 1 : (a.pontos > b.pontos) ? -1 : 0);
+  let response = `🏆 Ranking de palpiteiros atualizado 🏆
+
+🥇 ${sortedRanking[0].autor} (${sortedRanking[0].pontos} pontos)
+🥈 ${sortedRanking[1].autor} (${sortedRanking[1].pontos} pontos)
+🥉 ${sortedRanking[2].autor} (${sortedRanking[2].pontos} pontos)
+--------\n`;
+  const sortedRankingRest = sortedRanking.slice(3);
+  sortedRankingRest.map((rest, idx) => response += `#${idx + 4} - ${rest.autor} (${rest.pontos} pontos)\n`)
+  return response;
 }
 
 module.exports = {
@@ -244,5 +243,6 @@ module.exports = {
   habilitaPalpite,
   organizaPalpites,
   checkResults,
-  ranking,
+  buscaIdAtivo,
+  organizaRanking,
 };
