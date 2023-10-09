@@ -75,21 +75,14 @@ async function habilitaJogador(message) {
     const checkFone = await database
       .collection('jogadores')
       .findOne({ fone: message.author });
-    if (checkFone) {
-      return { code: 401 };
-    }
+    if (checkFone.jogador) return { code: 401, jogador: checkFone.jogador };
     const username = message.body.substring(10).trim().substring(0, 20);
     await database
       .collection('jogadores')
-      .insertOne({
-        fone: message.author,
-        jogador: username,
-        pontos: 0,
-        historico: [],
-      });
+      .update({ fone: message.author }, { jogador: username }, { $upsert: true });
     await database
       .collection('palpites')
-      .updateMany({ fone: message.author }, { $set: { jogador: username } });
+      .updateMany({ fone: message.author }, { $set: { autor: username } });
     return { code: 201, message: `Olá, ${username}!
 
 Você está habilitado para o bolão (em fase de testes).

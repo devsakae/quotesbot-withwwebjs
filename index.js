@@ -227,7 +227,7 @@ async function bolaoSystemFunc(message) {
   if (message.body.startsWith('!habilitar')) {
     const habilitado = await habilitaJogador(message);
     if (habilitado.code === 500) return adminWarning(habilitado.message);
-    if (habilitado.code === 401) return message.reply(`Você está habilitado como ${habilitado.message}`);
+    if (habilitado.code === 401) return message.reply(`Você já está habilitado como *${habilitado.jogador}*, não vai mudar de nome e pronto`);
     message.react('🎟');
     return client.sendMessage(message.author, habilitado.message);
   }
